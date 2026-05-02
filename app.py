@@ -22,6 +22,40 @@ import pandas as pd
 from tools.ibkr import get_portfolio, get_account_value, get_eur_usd_rate
 
 # ---------------------------------------------------------------------------
+# Demo data — used when TWS is not running
+# ---------------------------------------------------------------------------
+DEMO_PORTFOLIO = {
+    "as_of": "2025-05-02T12:00:00",
+    "total_positions": 6,
+    "summary": {
+        "total_invested":        42500.00,
+        "total_current_value":   48320.50,
+        "total_unrealized_pnl":   5820.50,
+        "total_unrealized_pnl_pct": 13.69,
+    },
+    "holdings": [
+        {"symbol": "AAPL",  "sec_type": "STK", "currency": "USD", "quantity": 50,  "avg_cost_per_share": 165.00, "invested_value": 8250.00,  "current_price": 189.50, "current_value": 9475.00,  "unrealized_pnl": 1225.00, "unrealized_pnl_pct": 14.85},
+        {"symbol": "MSFT",  "sec_type": "STK", "currency": "USD", "quantity": 30,  "avg_cost_per_share": 310.00, "invested_value": 9300.00,  "current_price": 378.90, "current_value": 11367.00, "unrealized_pnl": 2067.00, "unrealized_pnl_pct": 22.23},
+        {"symbol": "GOOGL", "sec_type": "STK", "currency": "USD", "quantity": 20,  "avg_cost_per_share": 125.00, "invested_value": 2500.00,  "current_price": 142.30, "current_value": 2846.00,  "unrealized_pnl":  346.00, "unrealized_pnl_pct": 13.84},
+        {"symbol": "AMZN",  "sec_type": "STK", "currency": "USD", "quantity": 25,  "avg_cost_per_share": 145.00, "invested_value": 3625.00,  "current_price": 132.10, "current_value": 3302.50,  "unrealized_pnl": -322.50, "unrealized_pnl_pct": -8.90},
+        {"symbol": "TLT",   "sec_type": "BOND","currency": "USD", "quantity": 100, "avg_cost_per_share":  92.00, "invested_value": 9200.00,  "current_price":  94.80, "current_value": 9480.00,  "unrealized_pnl":  280.00, "unrealized_pnl_pct":  3.04},
+        {"symbol": "BND",   "sec_type": "BOND","currency": "USD", "quantity": 100, "avg_cost_per_share":  76.25, "invested_value": 7625.00,  "current_price":  77.60, "current_value": 7760.00,  "unrealized_pnl":  135.00, "unrealized_pnl_pct":  1.77},
+        {"symbol": "NVDA",  "sec_type": "STK", "currency": "USD", "quantity": 15,  "avg_cost_per_share": 450.00, "invested_value": 6750.00,  "current_price": 503.40, "current_value": 7551.00,  "unrealized_pnl":  801.00, "unrealized_pnl_pct": 11.87},
+    ],
+}
+DEMO_ACCOUNT = {
+    "as_of": "2025-05-02T12:00:00",
+    "account": "DEMO123",
+    "net_liquidation_value": 51320.50,
+    "total_cash":             3000.00,
+    "stock_value":           48320.50,
+    "unrealized_pnl":         5820.50,
+    "realized_pnl":            420.00,
+    "currency": "USD",
+}
+DEMO_EUR_USD = 1.0842
+
+# ---------------------------------------------------------------------------
 # Page config
 # ---------------------------------------------------------------------------
 st.set_page_config(
@@ -65,11 +99,15 @@ def _to_eur(value: float, rate: float) -> float:
 # Load data (cached for 60 s so refresh doesn't hammer IBKR)
 # ---------------------------------------------------------------------------
 @st.cache_data(ttl=60)
-def load_data():
-    portfolio  = get_portfolio()
-    account    = get_account_value()
-    eur_usd    = get_eur_usd_rate()   # e.g. 1.08 means 1 EUR = 1.08 USD
-    return portfolio, account, eur_usd
+def load_data() -> tuple[dict, dict, float, bool]:
+    """Returns (portfolio, account, eur_usd_rate, is_demo)."""
+    try:
+        portfolio = get_portfolio()
+        account   = get_account_value()
+        eur_usd   = get_eur_usd_rate()
+        return portfolio, account, eur_usd, False
+    except Exception:
+        return DEMO_PORTFOLIO, DEMO_ACCOUNT, DEMO_EUR_USD, True
 
 # ---------------------------------------------------------------------------
 # UI
@@ -85,15 +123,18 @@ with col_refresh:
 
 # ── Load ────────────────────────────────────────────────────────────────────
 with st.spinner("Connecting to IBKR..."):
-    try:
-        portfolio, account, eur_usd_rate = load_data()
-    except Exception as e:
-        st.error(f"Could not connect to IBKR: {e}")
-        st.info("Make sure TWS is running and API is enabled on port 7497.")
-        st.stop()
+    portfolio, account, eur_usd_rate, is_demo = load_data()
+
+if is_demo:
+    st.warning(
+        "⚠️ TWS is not reachable on port 7497 — showing **demo data**. "
+        "Start TWS and click 🔄 Refresh to load your live portfolio.",
+        icon="⚠️",
+    )
 
 with col_time:
-    st.caption(f"As of {portfolio['as_of']} · EUR/USD: {eur_usd_rate:.4f}")
+    label = "Demo" if is_demo else "Live"
+    st.caption(f"{label} · As of {portfolio['as_of']} · EUR/USD: {eur_usd_rate:.4f}")
 
 holdings = portfolio["holdings"]
 summary  = portfolio["summary"]
