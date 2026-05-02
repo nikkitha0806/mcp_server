@@ -28,13 +28,27 @@ _ib: IB | None = None
 
 
 def _get_ib() -> IB:
-    """Return a connected, read-only IB instance."""
+    """Return a connected, read-only IB instance.
+
+    Tries IBKR_CLIENT_ID first, then increments up to +9 until a free ID is found.
+    """
     global _ib
     util.startLoop()
-    if _ib is None or not _ib.isConnected():
-        _ib = IB()
-        _ib.connect(IBKR_HOST, IBKR_PORT, clientId=IBKR_CLIENT_ID, readonly=True)
-    return _ib
+    if _ib is not None and _ib.isConnected():
+        return _ib
+
+    last_error = None
+    for client_id in range(IBKR_CLIENT_ID, IBKR_CLIENT_ID + 10):
+        try:
+            ib = IB()
+            ib.connect(IBKR_HOST, IBKR_PORT, clientId=client_id, readonly=True, timeout=10)
+            _ib = ib
+            return _ib
+        except Exception as e:
+            last_error = e
+            continue
+
+    raise ConnectionError(f"Could not connect to TWS on {IBKR_HOST}:{IBKR_PORT} — all client IDs {IBKR_CLIENT_ID}–{IBKR_CLIENT_ID+9} in use. Last error: {last_error}")
 
 
 def get_portfolio() -> dict:
