@@ -21,7 +21,8 @@ from ib_insync import IB, Forex, util
 
 IBKR_HOST = os.getenv("IBKR_HOST", "127.0.0.1")
 IBKR_PORT = int(os.getenv("IBKR_PORT", "7497"))
-IBKR_CLIENT_ID = int(os.getenv("IBKR_CLIENT_ID", "1"))
+# MCP server uses client ID 1; app uses 10 to avoid "client id already in use" errors.
+IBKR_CLIENT_ID = int(os.getenv("IBKR_CLIENT_ID", "10"))
 
 _ib: IB | None = None
 

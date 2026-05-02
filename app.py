@@ -106,15 +106,15 @@ def _to_eur(value: float, rate: float) -> float:
 # Load data (cached for 60 s so refresh doesn't hammer IBKR)
 # ---------------------------------------------------------------------------
 @st.cache_data(ttl=60)
-def load_data() -> tuple[dict, dict, float, bool]:
-    """Returns (portfolio, account, eur_usd_rate, is_demo)."""
+def load_data() -> tuple[dict, dict, float, bool, str]:
+    """Returns (portfolio, account, eur_usd_rate, is_demo, error_message)."""
     try:
         portfolio = get_portfolio()
         account   = get_account_value()
         eur_usd   = get_eur_usd_rate()
-        return portfolio, account, eur_usd, False
-    except Exception:
-        return DEMO_PORTFOLIO, DEMO_ACCOUNT, DEMO_EUR_USD, True
+        return portfolio, account, eur_usd, False, ""
+    except Exception as e:
+        return DEMO_PORTFOLIO, DEMO_ACCOUNT, DEMO_EUR_USD, True, str(e)
 
 # ---------------------------------------------------------------------------
 # UI
@@ -130,14 +130,22 @@ with col_refresh:
 
 # ── Load ────────────────────────────────────────────────────────────────────
 with st.spinner("Connecting to IBKR..."):
-    portfolio, account, eur_usd_rate, is_demo = load_data()
+    portfolio, account, eur_usd_rate, is_demo, conn_error = load_data()
 
 if is_demo:
     st.warning(
-        "⚠️ TWS is not reachable on port 7497 — showing **demo data**. "
-        "Start TWS and click 🔄 Refresh to load your live portfolio.",
-        icon="⚠️",
+        "⚠️ Showing **demo data** — could not connect to IBKR. "
+        "Start TWS, enable the API on port 7497, then click 🔄 Refresh.",
     )
+    with st.expander("🔍 Connection error details"):
+        st.code(conn_error or "Unknown error")
+        st.markdown(
+            "**Common causes:**\n"
+            "- TWS is not running\n"
+            "- API not enabled: TWS → Edit → Global Configuration → API → Settings → ✅ Enable ActiveX and Socket Clients\n"
+            "- Wrong port: confirm Socket port is `7497` (paper) or `7496` (live) in TWS\n"
+            "- After enabling the API, **restart TWS** and click Refresh"
+        )
 
 with col_time:
     label = "Demo" if is_demo else "Live"
