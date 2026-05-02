@@ -25,7 +25,8 @@ from ib_insync import IB, util
 # ── Primary connection ────────────────────────────────────────────────────────
 IBKR_HOST      = os.getenv("IBKR_HOST", "127.0.0.1")
 IBKR_PORT      = int(os.getenv("IBKR_PORT", "7497"))
-IBKR_CLIENT_ID = int(os.getenv("IBKR_CLIENT_ID", "10"))
+# MCP server uses client ID 1. App starts at 50 to stay far from common conflicts.
+IBKR_CLIENT_ID = int(os.getenv("IBKR_CLIENT_ID", "50"))
 IBKR_ACCOUNTS  = os.getenv("IBKR_ACCOUNTS", "")   # optional comma-separated filter
 
 # ── Secondary connection (optional second TWS) ────────────────────────────────

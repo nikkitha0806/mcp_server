@@ -16,7 +16,7 @@ import plotly.graph_objects as go
 import plotly.express as px
 import pandas as pd
 
-from tools.ibkr import get_all_portfolios, get_all_account_values
+from tools.ibkr import get_all_portfolios, get_all_account_values, _get_connections
 
 # ---------------------------------------------------------------------------
 # Demo data
@@ -106,11 +106,20 @@ def _to_df(holdings: list[dict]) -> pd.DataFrame:
     return df
 
 # ---------------------------------------------------------------------------
-# Load data
+# Connections — cached as a resource so one connection is made per server
+# lifetime, not on every page reload.
+# ---------------------------------------------------------------------------
+@st.cache_resource
+def _init_connections():
+    return _get_connections()
+
+# ---------------------------------------------------------------------------
+# Load data — fetches fresh portfolio data using the cached connections
 # ---------------------------------------------------------------------------
 @st.cache_data(ttl=60)
 def load_data() -> tuple[dict, dict, bool, str]:
     try:
+        _init_connections()          # ensure connection is alive before fetching
         return get_all_portfolios(), get_all_account_values(), False, ""
     except Exception as e:
         return DEMO_DATA, DEMO_ACCOUNTS, True, str(e)
@@ -223,6 +232,7 @@ col_refresh, col_time = st.columns([1, 5])
 with col_refresh:
     if st.button("🔄 Refresh"):
         st.cache_data.clear()
+        st.cache_resource.clear()
         st.rerun()
 
 with st.spinner("Connecting to IBKR..."):
