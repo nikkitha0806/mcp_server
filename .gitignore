@@ -27,3 +27,7 @@ Thumbs.db
 # Env files
 .env
 .env.*
+
+# Google OAuth credentials — never commit these
+credentials/credentials.json
+credentials/token.json
