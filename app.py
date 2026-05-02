@@ -70,13 +70,20 @@ st.set_page_config(
 EQUITY_TYPES = {"STK", "ETF"}
 DEBT_TYPES   = {"BOND", "BILL", "FIXED"}
 
-def classify(sec_type: str) -> str:
+# Symbol-level overrides — take priority over sec_type rules.
+SYMBOL_OVERRIDES: dict[str, str] = {
+    "XEON": "Debt",
+}
+
+def classify(symbol: str, sec_type: str) -> str:
+    if symbol.upper() in SYMBOL_OVERRIDES:
+        return SYMBOL_OVERRIDES[symbol.upper()]
     s = sec_type.upper()
     if s in EQUITY_TYPES:
         return "Equity"
     if s in DEBT_TYPES:
         return "Debt"
-    return "Other"
+    return "Equity"   # default remaining to Equity
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -147,7 +154,7 @@ if not holdings:
 r = eur_usd_rate
 
 df = pd.DataFrame(holdings)
-df["category"]         = df["sec_type"].apply(classify)
+df["category"]         = df.apply(lambda row: classify(row["symbol"], row["sec_type"]), axis=1)
 df["invested_value"]   = df["invested_value"].apply(lambda v: _to_eur(v, r))
 df["current_value"]    = df["current_value"].apply(lambda v: _to_eur(v, r))
 df["unrealized_pnl"]   = df["unrealized_pnl"].apply(lambda v: _to_eur(v, r))
