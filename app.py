@@ -147,9 +147,6 @@ if not holdings:
     st.warning("No positions found in your account.")
     st.stop()
 
-# ── Convert all monetary values USD → EUR ───────────────────────────────────
-r = eur_usd_rate
-
 df = pd.DataFrame(holdings)
 df["category"] = df.apply(lambda row: classify(row["symbol"], row["sec_type"]), axis=1)
 
