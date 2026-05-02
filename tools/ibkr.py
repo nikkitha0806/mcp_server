@@ -17,7 +17,7 @@ Port reference:
 import os
 from datetime import datetime
 
-from ib_insync import IB, Forex, util
+from ib_insync import IB, util
 
 IBKR_HOST = os.getenv("IBKR_HOST", "127.0.0.1")
 IBKR_PORT = int(os.getenv("IBKR_PORT", "7497"))
@@ -95,24 +95,6 @@ def get_portfolio() -> dict:
         },
         "holdings": holdings,
     }
-
-
-def get_eur_usd_rate() -> float:
-    """
-    Fetch the live EUR/USD exchange rate from IBKR.
-    Returns how many USD equal 1 EUR (e.g. 1.08).
-    Dividing a USD value by this gives the EUR equivalent.
-    """
-    ib = _get_ib()
-    contract = Forex("EURUSD")
-    ib.qualifyContracts(contract)
-    ticker = ib.reqMktData(contract, "", False, False)
-    ib.sleep(1)
-    rate = ticker.last or ticker.bid or ticker.ask
-    ib.cancelMktData(contract)
-    if not rate or rate != rate:   # guard against NaN
-        raise ValueError("Could not retrieve EUR/USD rate from IBKR")
-    return float(rate)
 
 
 def get_account_value() -> dict:

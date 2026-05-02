@@ -19,7 +19,7 @@ import plotly.graph_objects as go
 import plotly.express as px
 import pandas as pd
 
-from tools.ibkr import get_portfolio, get_account_value, get_eur_usd_rate
+from tools.ibkr import get_portfolio, get_account_value
 
 # ---------------------------------------------------------------------------
 # Demo data — used when TWS is not running
@@ -53,8 +53,6 @@ DEMO_ACCOUNT = {
     "realized_pnl":            420.00,
     "currency": "USD",
 }
-DEMO_EUR_USD = 1.0842
-
 # ---------------------------------------------------------------------------
 # Page config
 # ---------------------------------------------------------------------------
@@ -89,38 +87,32 @@ def classify(symbol: str, sec_type: str) -> str:
 # Helpers
 # ---------------------------------------------------------------------------
 def _fmt(value: float) -> str:
-    """Format a number as Euro currency string."""
     if value >= 0:
-        return f"€{value:,.2f}"
-    return f"-€{abs(value):,.2f}"
+        return f"${value:,.2f}"
+    return f"-${abs(value):,.2f}"
 
 def _pct(value: float) -> str:
     sign = "+" if value >= 0 else ""
     return f"{sign}{value:.2f}%"
 
-def _to_eur(value: float, rate: float) -> float:
-    """Convert a USD value to EUR using the EUR/USD rate."""
-    return value / rate
-
 # ---------------------------------------------------------------------------
 # Load data (cached for 60 s so refresh doesn't hammer IBKR)
 # ---------------------------------------------------------------------------
 @st.cache_data(ttl=60)
-def load_data() -> tuple[dict, dict, float, bool, str]:
-    """Returns (portfolio, account, eur_usd_rate, is_demo, error_message)."""
+def load_data() -> tuple[dict, dict, bool, str]:
+    """Returns (portfolio, account, is_demo, error_message)."""
     try:
         portfolio = get_portfolio()
         account   = get_account_value()
-        eur_usd   = get_eur_usd_rate()
-        return portfolio, account, eur_usd, False, ""
+        return portfolio, account, False, ""
     except Exception as e:
-        return DEMO_PORTFOLIO, DEMO_ACCOUNT, DEMO_EUR_USD, True, str(e)
+        return DEMO_PORTFOLIO, DEMO_ACCOUNT, True, str(e)
 
 # ---------------------------------------------------------------------------
 # UI
 # ---------------------------------------------------------------------------
 st.title("📈 Portfolio Net Worth")
-st.caption("Live data from Interactive Brokers · all values in Euro · refreshes every 60 seconds")
+st.caption("Live data from Interactive Brokers · all values in USD · refreshes every 60 seconds")
 
 col_refresh, col_time = st.columns([1, 5])
 with col_refresh:
@@ -130,13 +122,10 @@ with col_refresh:
 
 # ── Load ────────────────────────────────────────────────────────────────────
 with st.spinner("Connecting to IBKR..."):
-    portfolio, account, eur_usd_rate, is_demo, conn_error = load_data()
+    portfolio, account, is_demo, conn_error = load_data()
 
 if is_demo:
-    st.warning(
-        "⚠️ Showing **demo data** — could not connect to IBKR. "
-        "Start TWS, enable the API on port 7497, then click 🔄 Refresh.",
-    )
+    st.warning("⚠️ Showing **demo data** — could not connect to IBKR. Start TWS, enable the API on port 7497, then click 🔄 Refresh.")
     with st.expander("🔍 Connection error details"):
         st.code(conn_error or "Unknown error")
         st.markdown(
@@ -149,7 +138,7 @@ if is_demo:
 
 with col_time:
     label = "Demo" if is_demo else "Live"
-    st.caption(f"{label} · As of {portfolio['as_of']} · EUR/USD: {eur_usd_rate:.4f}")
+    st.caption(f"{label} · As of {portfolio['as_of']}")
 
 holdings = portfolio["holdings"]
 summary  = portfolio["summary"]
@@ -162,23 +151,18 @@ if not holdings:
 r = eur_usd_rate
 
 df = pd.DataFrame(holdings)
-df["category"]         = df.apply(lambda row: classify(row["symbol"], row["sec_type"]), axis=1)
-df["invested_value"]   = df["invested_value"].apply(lambda v: _to_eur(v, r))
-df["current_value"]    = df["current_value"].apply(lambda v: _to_eur(v, r))
-df["unrealized_pnl"]   = df["unrealized_pnl"].apply(lambda v: _to_eur(v, r))
-df["avg_cost_per_share"]= df["avg_cost_per_share"].apply(lambda v: _to_eur(v, r))
-df["current_price"]    = df["current_price"].apply(lambda v: _to_eur(v, r))
+df["category"] = df.apply(lambda row: classify(row["symbol"], row["sec_type"]), axis=1)
 
 # ── Top metrics ─────────────────────────────────────────────────────────────
 st.markdown("---")
 m1, m2, m3, m4, m5 = st.columns(5)
 
-net_liq       = _to_eur(account["net_liquidation_value"], r)
-total_stocks  = _to_eur(account["stock_value"],           r)
-total_cash    = _to_eur(account["total_cash"],            r)
-total_invested= _to_eur(summary["total_invested"],        r)
-total_pnl     = _to_eur(summary["total_unrealized_pnl"],  r)
-total_pnl_pct = summary["total_unrealized_pnl_pct"]       # % is currency-neutral
+net_liq        = account["net_liquidation_value"]
+total_stocks   = account["stock_value"]
+total_cash     = account["total_cash"]
+total_invested = summary["total_invested"]
+total_pnl      = summary["total_unrealized_pnl"]
+total_pnl_pct  = summary["total_unrealized_pnl_pct"]
 
 m1.metric("Net Worth",      _fmt(net_liq))
 m2.metric("Stock Value",    _fmt(total_stocks))
@@ -216,7 +200,7 @@ with left:
         hole=0.55,
         marker_colors=["#3b82f6", "#f59e0b", "#8b5cf6"],
         textinfo="label+percent",
-        hovertemplate="<b>%{label}</b><br>Current Value: €%{value:,.2f}<extra></extra>",
+        hovertemplate="<b>%{label}</b><br>Current Value: $%{value:,.2f}<extra></extra>",
     ))
     fig_donut.update_layout(
         title="Current Value Allocation",
@@ -251,7 +235,7 @@ with right:
         height=320,
         margin=dict(t=40, b=0, l=0, r=0),
         legend=dict(orientation="h", y=-0.15),
-        yaxis_tickprefix="€",
+        yaxis_tickprefix="$",
         yaxis_tickformat=",.0f",
     )
     st.plotly_chart(fig_bar, use_container_width=True)
@@ -290,9 +274,9 @@ def render_table(data: pd.DataFrame):
 
     display.columns = [
         "Symbol", "Type", "Quantity",
-        "Avg Cost (€)", "Invested (€)",
-        "Current Price (€)", "Current Value (€)",
-        "Unrealized P&L (€)", "P&L %",
+        "Avg Cost ($)", "Invested ($)",
+        "Current Price ($)", "Current Value ($)",
+        "Unrealized P&L ($)", "P&L %",
     ]
 
     def style_pnl(val):
@@ -301,13 +285,13 @@ def render_table(data: pd.DataFrame):
 
     styled = (
         display.style
-        .map(style_pnl, subset=["Unrealized P&L (€)", "P&L %"])
+        .map(style_pnl, subset=["Unrealized P&L ($)", "P&L %"])
         .format({
-            "Avg Cost (€)":        "€{:,.4f}",
-            "Invested (€)":        "€{:,.2f}",
-            "Current Price (€)":   "€{:,.4f}",
-            "Current Value (€)":   "€{:,.2f}",
-            "Unrealized P&L (€)":  "€{:,.2f}",
+            "Avg Cost ($)":        "${:,.4f}",
+            "Invested ($)":        "${:,.2f}",
+            "Current Price ($)":   "${:,.4f}",
+            "Current Value ($)":   "${:,.2f}",
+            "Unrealized P&L ($)":  "${:,.2f}",
             "P&L %":               "{:+.2f}%",
             "Quantity":            "{:,.0f}",
         })
@@ -333,13 +317,13 @@ fig_stocks = px.bar(
     orientation="h",
     text="current_value",
     color_discrete_map={"Equity": "#3b82f6", "Debt": "#f59e0b", "Other": "#8b5cf6"},
-    labels={"current_value": "Current Value (€)", "symbol": ""},
+    labels={"current_value": "Current Value ($)", "symbol": ""},
 )
-fig_stocks.update_traces(texttemplate="€%{text:,.0f}", textposition="outside")
+fig_stocks.update_traces(texttemplate="$%{text:,.0f}", textposition="outside")
 fig_stocks.update_layout(
     height=max(300, len(df) * 40),
     margin=dict(t=20, b=0, l=0, r=80),
-    xaxis_tickprefix="€",
+    xaxis_tickprefix="$",
     xaxis_tickformat=",.0f",
     legend_title="",
 )
