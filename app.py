@@ -2,6 +2,16 @@
 
 import sys
 import os
+import asyncio
+
+# Streamlit runs in a worker thread that has no event loop.
+# eventkit (used by ib_insync) grabs the loop at import time, so we must
+# create one before the import happens.
+try:
+    asyncio.get_event_loop()
+except RuntimeError:
+    asyncio.set_event_loop(asyncio.new_event_loop())
+
 sys.path.insert(0, os.path.dirname(__file__))
 
 import streamlit as st
